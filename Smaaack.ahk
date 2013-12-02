@@ -4,13 +4,16 @@
 ; Brought to you by Homer Sapions, April 2013
 
 ; To-do
-; - use FileInstall to embed a .wav file
-; - add a tray emnu item to enable/disable sounds
-; - play the sound after smacking if sound is enabled
+; - Add code to test if Sounds directory exists and contains wavs to be played as alternates
 
 ; Change record
 SMAAACK_Changes =
 (
+Changes with v 1.2.2
+   - Added a check for a directory named Sounds in the same directory where Smaaack is
+     installed. If one is found, and it contains .wav files, then these will be read,
+     and one picked at random to be played each time SM is smacked.
+
 Changes with v 1.2.1
    - Bug fix for reactivating the window that was active right before a smack
    - Added a little bit of silly fun, a smack sound can be turned on now when SM is smacked
@@ -28,7 +31,7 @@ Changes with v 1.2.0
        show it is randomized.
     When the smack interval is changed usng the tray menu slider, update the random intervals if
        randomize is enabled.
-  - Added a Disable when PC Locked menu item. Default is to NOT disable when the screensave kicks in.
+  - Added a Disable when PC Locked menu item. Default is to NOT disable when the screensaver kicks in.
        This means %Program% will continue to smack even when the PC is locked and the screensaver active.
        When PC lock disable is passed as a command line parameter, turn on the check mark in the tray menu to
        show it is disabled.
@@ -56,7 +59,7 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.2.1"
+Version := "v1.2.2"
 Author := "Homer Sapions"
 HomePage = http://code.google.com/p/Smaaack/
 Minutes = 14
@@ -64,7 +67,7 @@ NewMinutes = 0
 Interval = 0
 SMTitle := "Service Manager"
 SMRefreshControl := "ToolbarWindow327"
-SMAWOLMsg = `n`nNOTE: %SMTitle% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %Program% is running.`nAt that time it will automatically begin smacking SM to prevent inactivity timeout
+SMAWOLMsg = `n`nNOTE: %SMTitle% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %SMTitle% is running.`nAt that time it will automatically begin smacking SM to prevent inactivity timeout
 SMDisableOvernight = 1
 SMDisableWhenLocked = 1
 SMRandomize = 1
@@ -78,8 +81,12 @@ Startup = 1
 FormatTime, StartTime,, hh:mm:ss tt
 SmackTime = None yet (start time: %StartTime%)
 SmackSound = 0
+SmackRandomWav = Smaaack.wav
+SmackWavCount = 0
 
 SetTitleMatchMode, 2   ; set for partial window title matching
+DetectHiddenWindows, On
+SetWorkingDir %A_ScriptDir%
 
 ; install the Smaaack wave file at compile time, extract as needed at run time
 FileInstall, Smaaack.wav, Smaaack.wav, 1
@@ -193,7 +200,16 @@ IfWinNotExist %SMTitle%
 }  ; end if SM is not currently open
 
 MsgBox ,,,%Intro%,20
-DetectHiddenWindows, On
+
+; Check for and read a list of all .wav files in the .\Sounds directory into SmackSounds
+IfExist %A_ScriptDir%\Sounds
+{
+   Loop, %A_ScriptDir%\Sounds\*.wav
+   {
+      SmackWavCount += 1
+      SmackWav%SmackWavCount% := A_LoopFileShortPath
+   }  ; end reading all files
+}  ; end if directory Sounds exists
 
 #Persistent
 Menu, tray, Icon, Smaaack.exe,, 1
@@ -291,6 +307,11 @@ return
 
 
 SmackSML:
+if SmackWavCount >= 1
+{
+   Random, RandomWav, 1, SmackWavCount
+   SmackRandomWav := SmackWav%RandomWav%
+}  ; end if there is 1 or more wav files in directory Sounds
 SmackSM()
 PCLockedNow = 0
 return
@@ -374,6 +395,8 @@ SmackSM()
    global RandomMinutesMax
    global RandomMinutesMin
    global Debug
+   global SmackRandomWav
+   global SmackWavCount
    
    FormatTime, HourNow,, H
    FormatTime, MinNow,, m
@@ -409,7 +432,14 @@ SmackSM()
          
          if SmackSound = 1
          {
-            SoundPlay, Smaaack.wav
+            if SmackWavCount >= 1
+            {
+               SoundPlay, %SmackRandomWav%
+            }  ; else if there is a Sounds direcotry with 1 or more wav files
+            else
+            {
+               SoundPlay, Smaaack.wav
+            }  ; end if there are no extra wav files
          }  ; end if smack sound is enabled
 
          IfEqual Minimized,-1, WinMinimize, %SMTitle%
@@ -518,6 +548,8 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
    ; Make a GUI about window
    Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon hwndPicExe, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
+   ;DllCall("Shell32\SHGetFileInfo" . (A_IsUnicode ? "W":"A"), "str", FileName
+   ;         , "uint", 0, ptr, &sfi, "uint", sfi_size, "uint", [color=red]0x100[/color])
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
    Gui, Font, s10, Verdana
@@ -612,7 +644,11 @@ All of these can be toggled through a pop up menu by right clicking the tray ico
    - Smaaack Sound: This enables or disables a sound when SM is smacked. Default is to NOT
       make any sound. This one is for fun. If it doesn't make you smile and appreciate this little
       program at least once, there's not much hope for you. You may as well go suck on a lemon
-      and see if that cheers you up a bit. s=n is the default
+      and see if that cheers you up a bit. s=n is the default.
+      If you want to choose your own sound(s), just create a directory named Sounds in the same
+      place where you put %Program%, and copy in any .wav files you want. Any .wav files found
+      will be read into a list in memory, and one chosen to be played at ramdom if sound is
+      enabled. This will over-ride the default sound built into %Program%
    s=y | snd=y | sound=y or s=n | snd=n | sound=n
 
 Three additional tray menu items are worth a mention:
