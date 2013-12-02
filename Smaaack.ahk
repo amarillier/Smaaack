@@ -2,17 +2,31 @@
 ; right of SM every 14 minutes
 
 ; To-do
-; - Randomize the delay between Minutes and some lower number so we are not always the same interval
 ; - Switch to not smack when screen is locked - default to keep on smacking
+; - Use Loop %0% to cycle through command line params to detect integer timeout, debug, nodisable, random etc.
+
+;Loop, %0%  ; For each parameter:
+;{
+;    param := %A_Index%  ; Fetch the contents of the variable whose name is contained in A_Index.
+;    MsgBox, 4,, Parameter number %A_Index% is %param%.  Continue?
+;    IfMsgBox, No
+;        break
+;}
 
 ; Changes
+; 1.1.4
+; - Added hyperlink to google code home page in About and Help windows
+; - Added a randomize capability to change the smack time delay between Minutes and half
+;   of Minutes so we are not always smacking at the same interval
+;
 ; 1.1.3
 ; - Added overnight disable, between 6pm and 7am. This can be over-ridden with a second parameter nodisable/nodis.
 ;   This means the timeout MUST be the first parameter
 ; 
 
 Program := "Smaaack!"
-Version := "v1.1.3"
+Version := "v1.1.4"
+HomePage = http://code.google.com/p/Smaaack/
 Minutes = 14
 NewMinutes = 0
 Interval = 0
@@ -20,6 +34,10 @@ SMTitle := "Service Manager"
 SMRefreshControl := "ToolbarWindow327"
 SMAWOLMsg = `n`nNOTE: %SMTitle% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %Program% is running.`nAt that time it will automatically begin smacking SM to prevent inactivity timeout
 SMDisableOvernight = 1
+SMRandomize = 0
+RandomMinutes = 0
+RandomMinutesMax = Minutes
+RandomMinutesMin := RandomMinutesMax // 2
 Debug = 0
 Smacked = 0
 FormatTime, Startup,, hh:mm:ss tt
@@ -82,6 +100,7 @@ Menu, tray, add, &About, AboutSmackL ; Creates an about menu item
 Menu, tray, add, &Help, HelpSmackL  ; Creates a help menu item.
 Menu, tray, add, &Change Timeout, ChangeSmackL
 Menu, tray, add, &Disable Smaaack, DisableSmackL
+Menu, tray, add, &Randomize Smaaack, RandomizeSmackL
 Menu, tray, add, &Smaaack now, SmackSML
 Menu, tray, add, &Exit, ExitSmackL  ; Creates an exit app menu item.
 Menu, tray, NoStandard  ; this removes the standard tray icon menu items
@@ -108,12 +127,35 @@ menu, tray, ToggleCheck, &Disable Smaaack
 Pause, toggle
 return
 
-ExitSmackL:
-ExitSmack()
-return
-
 SmackSML:
 SmackSM()
+return
+
+RandomizeSmackL:
+menu, tray, ToggleCheck, &Randomize Smaaack
+if SMRandomize = 0
+{
+   SMRandomize = 1
+   RandomMinutesMax = %Minutes%
+   RandomMinutesMin := RandomMinutesMax // 2
+   Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax
+   if Debug = 1
+   {
+      MsgBox ,,%Program%: Randomize, Randomize is now set to %SMRandomize%`nMinutes = %Minutes%`nRandomMinutes = %RandomMinutes%`nMin = %RandomMinutesMin% Max = %RandomMinutesMax%,
+   }  ; end if debug mode
+   SetTimer, SmackSML, off,0
+   SetTimer, SmackSML, %RandomMinutes%,0
+}  ; end if randomize is not yet on
+else
+{
+   SMRandomize = 0
+   SetTimer, SmackSML, off,0
+   SetTimer, SmackSML, %Interval%,0
+}  ; end if randomize is already on
+return
+
+ExitSmackL:
+ExitSmack()
 return
 
 
@@ -122,12 +164,22 @@ SmackSM()
 {
    global Program
    global Version
+   global HomePage
    global Minutes
+   global Interval
+   global NewMinutes
+   global Message
    global SMTitle
-   global SMRefreshControl
-   global SMDisableOvernight
+   global HomePage
    global Smacked
    global SmackTime
+   global SMAWOLMsg
+   global SMRefreshControl
+   global SMDisableOvernight
+   global SMRandomize
+   global RandomMinutes
+   global RandomMinutesMax
+   global RandomMinutesMin
    global Debug
    
    FormatTime, HourNow,, H
@@ -161,7 +213,13 @@ SmackSM()
          {
             MsgBox ,,TEST,Smacked is %Smacked%,5
          }  ; end if debug mode
-      
+         if (SMRandomize = 1) and (Minutes > 4)
+         {
+            Random, RandonMinutes, RandomMinutesMin, RandomMinutesMax  ; Random, OutputVar [, Min, Max]
+            SetTimer, SmackSML, off,0
+            RandomInterval = RandomMinutes * 60 * 1000
+            SetTimer, SmackSML, %RandomInterval%,0
+         }  ; end if SMRandomize is 1
       }  ; end if SM is active
       else
       {
@@ -186,25 +244,43 @@ AboutSmack()
 {
    global Program
    global Version
+   global HomePage
    global Minutes
+   global Interval
+   global NewMinutes
+   global Message
    global SMTitle
+   global HomePage
    global Smacked
    global SmackTime
    global SMAWOLMsg
+   global SMRefreshControl
+   global SMDisableOvernight
+   global SMRandomize
+   global RandomMinutes
+   global RandomMinutesMax
+   global RandomMinutesMin
    global Debug
   
    Stuff := ""
    IfWinNotExist %SMTitle%
    {
-      Stuff = %SMAWOLMsg%`n
+      Stuff = %SMAWOLMsg%
    }  ; end if SM is active
+   
+   RandomMessage := ""
+   if SMRandomize = 1
+   {
+      RandomMessage := "`nRandom timing is enabled at " . RandomMinutes . " minutes (from " . RandomMinutesMin . " to " . RandomMinutesMax . ")`n"
+   }  ; end if randomize is on
    
    AboutMessage =
    (
 %Program%, %Version% has smacked SM %Smacked% times so far!
+The most recent smack: %SmackTime%
 
-Current setting is to smack SM every %Minutes% minutes to stop it from
-timing you out. The most recent smack: %SmackTime%
+%RandomMessage%
+Standard setting is to smack SM every %Minutes% minutes to stop it from timing you out. 
 %Stuff%
 The default interval is 14 minutes which should subdue the obnoxious beast
 known as the SM inactivity timeout. If this doesn't work for you for some
@@ -217,7 +293,7 @@ a new integer parameter which will prompt if you want to reload the program.
 
 e.g. Smaaack 10
 
-%Program% is brought to you by a former
+%Program% is brought to you by Homer Sapions, a former
 "I hate the SM inactivity timeout" disgruntled user. Have fun!
 
 Please use %Program% responsibly.
@@ -227,17 +303,21 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
 
    ; -------------------------------------------
    ; Make a GUI about window
-   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
+   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon hwndPicExe, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
-   Gui, Add, Text, x266 y6, %AboutMessage%
+   Gui, Add, Text,x266 y6, %AboutMessage%
+   Gui, Font, underline
+   Gui, Add, Text, cBlue gAboutHomePage, Click here to visit %Program%'s home page
+   Gui, Font, norm
+
    Gui, Add, Button, default, CloseAbout
    Gui, Show,, About: %Program% %Version%
    Return
 
-   AboutEggClick:
-   MsgBox,,%Program% Home Page, %Program% Home page: https://code.google.com/p/Smaaack,5
+   AboutHomePage:
+   Run %HomePage%
    return
    
    GuiEscape:
@@ -250,15 +330,29 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
    ; MsgBox, 0, %Program% %Version%, %AboutMessage%, 20
    
    return
-}  ; end of AboutSmackGUI
+}  ; end of AboutSmack
 
 ; ------------------------------------
 HelpSmack()
 {
    global Program
    global Version
+   global HomePage
    global Minutes
+   global Interval
+   global NewMinutes
+   global Message
+   global SMTitle
+   global HomePage
    global Smacked
+   global SmackTime
+   global SMAWOLMsg
+   global SMRefreshControl
+   global SMDisableOvernight
+   global SMRandomize
+   global RandomMinutes
+   global RandomMinutesMax
+   global RandomMinutesMin
    global Debug
    
    HelpMessage =
@@ -302,23 +396,26 @@ a mention.
     After SM is smacked, all items in the System Navigator panel should be collapsed.
 
 
-%Program% is brought to you by a former
+%Program% is brought to you by Homer Sapions, a former
 "I hate the SM inactivity timeout" disgruntled user. Have fun!
    )
    
    ; -------------------------------------------
    ; Make a GUI help window
-   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
+   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gHelpHomePage Icon hwndPicExe, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
    Gui, 2: Add, Text, x266 y6, %HelpMessage%
+   Gui, 2: Font, underline
+   Gui, 2: Add, Text, cBlue gHelpHomePage, Click here to visit %Program%'s home page
+   Gui, 2: Font, norm
    Gui, 2: Add, Button, default, CloseHelp
    Gui, 2: Show,, Help: %Program% %Version%
    Return
-
-   HelpEggClick:
-   MsgBox,,%Program% Home Page, %Program% Home page: https://code.google.com/p/Smaaack,5
+   
+   HelpHomePage:
+   Run %HomePage%
    return
    
    2GuiEscape:
@@ -336,10 +433,24 @@ a mention.
 ; ------------------------------------
 ChangeSmack()
 {
+   global Program
+   global Version
+   global HomePage
    global Minutes
    global Interval
    global NewMinutes
    global Message
+   global SMTitle
+   global HomePage
+   global Smacked
+   global SmackTime
+   global SMAWOLMsg
+   global SMRefreshControl
+   global SMDisableOvernight
+   global SMRandomize
+   global RandomMinutes
+   global RandomMinutesMax
+   global RandomMinutesMin
    global Debug
    
    NewMinutes := Minutes
