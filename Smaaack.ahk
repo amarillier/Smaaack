@@ -220,9 +220,6 @@ e.g. Smaaack 10
 %Program% is brought to you by a former
 "I hate the SM inactivity timeout" disgruntled user. Have fun!
 
-Did you *really* expect to find out who wrote this? Not likely ... :-)
-Maybe there's an egg.
-
 Please use %Program% responsibly.
 You can talk %Program%. You can %Program% your lips.
 Don't %Program% and drive. Don't %Program% your spouse or kids.
@@ -231,26 +228,16 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
    ; -------------------------------------------
    ; Make a GUI about window
    Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
-   Gui, 1: Add, Picture, w1 h1 gAboutHomerS Icon, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
    Gui, Add, Text, x266 y6, %AboutMessage%
    Gui, Add, Button, default, CloseAbout
-   Gui, 1: Add, Picture, w1 h1 gAboutEgg3 Icon, Smaaack.exe
    Gui, Show,, About: %Program% %Version%
    Return
 
    AboutEggClick:
-   MsgBox, 0, %Program% Easter egg, What? Now you think you're smart or something?`n`nYou really want to know who wrote this?`nNice try! At least you found the Easter egg.`nMaybe there are more.
-   return
-   
-   AboutHomerS:
-   MsgBox, 0, %Program% Easter egg, Now you're onto something!`n`nDoes 'Homer Sapions' mean anything to you? `n`nNo? ... too bad!`nKeep looking for eggs, you might find more ...
-   return
-   
-   AboutEgg3:
-   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@<a big email>.com and see if Homer Sapions responds!
+   MsgBox,,%Program% Home Page, %Program% Home page: https://code.google.com/p/Smaaack,5
    return
    
    GuiEscape:
@@ -317,34 +304,21 @@ a mention.
 
 %Program% is brought to you by a former
 "I hate the SM inactivity timeout" disgruntled user. Have fun!
-
-Did you *really* expect to find out who wrote this? Not likely ... :-)
-Maybe there's an egg.
    )
    
    ; -------------------------------------------
    ; Make a GUI help window
    Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
-   Gui, 2: Add, Picture, w1 h1 gHelpHomerS Icon, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
    Gui, 2: Add, Text, x266 y6, %HelpMessage%
    Gui, 2: Add, Button, default, CloseHelp
-   Gui, 2: Add, Picture, w1 h1 gHelpEgg3 Icon, Smaaack.exe
    Gui, 2: Show,, Help: %Program% %Version%
    Return
 
    HelpEggClick:
-   MsgBox, 0, %Program% Easter egg, What? Now you think you're smart or something?`n`nYou really want to know who wrote this?`nNice try! At least you found the Easter egg.
-   return
-   
-   HelpHomerS:
-   MsgBox, 0, %Program% Easter egg, Now you're onto something!`n`nDoes 'Homer Sapions' mean anything to you? `nNo? ... too bad!
-   return
-   
-   HelpEgg3:
-   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@<a big email>.com and see if Homer Sapions responds!
+   MsgBox,,%Program% Home Page, %Program% Home page: https://code.google.com/p/Smaaack,5
    return
    
    2GuiEscape:
@@ -387,7 +361,6 @@ ChangeSmack()
    Gui, Add, Text, h20 x560 y60, 55
    Gui, Add, Text, h20 x610 y60, 60
    Gui, Add, button, x300, OK
-   ;Gui, Add, Picture, w1 h2 gChangeEgg Icon, Smaaack.exe
    Gui, Show
    GuiControl,,Message,%Message%
    Return 
@@ -409,10 +382,6 @@ ChangeSmack()
    NewMessage = Pick a new timeout prevention Smaaack value (currently %Minutes% will change to %NewMinutes%)
    GuiControl,,Message, %NewMessage%
    Return
-   
-   ChangeEgg:
-   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@gmail.com and see if Homer Sapions responds!
-   return
    
 }  ; end of ChangeSmack
 
