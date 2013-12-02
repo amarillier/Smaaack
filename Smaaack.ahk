@@ -4,17 +4,16 @@
 ; Brought to you by Homer Sapions, April 2013
 
 ; To-do
-; - Fix - not updating smacktime when smacking after change to random ???
-; - Bug with smacking when random, and time is 3 minutes or so, goes wild
+; - Fix help not displa from command line parameter at startup
 
 ; Change record
 SMAAACK_Changes =
 (
-Changes with v 1.1.4
+Changes with v 1.2.0
   - Added a hyperlink to google code home page in About and Help windows.
-  - Added a Randomize capability to change the smack time delay between defined smack interval and half
-       of smack interval so we are not always smacking at the same interval. Randomize is now default at
-       startup.
+  - Added a Randomize capability to change the smack time delay between defined smack interval and one
+       third of smack interval so we are not always smacking at the same interval. Randomize is now
+       default at startup.
        When randomize is passed as a command line parameter, turn on the check mark in the tray menu to
        show it is randomized.
     When the smack interval is changed usng the tray menu slider, update the random intervals if
@@ -47,7 +46,7 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.1.4"
+Version := "v1.2.0"
 Author := "Homer Sapions"
 HomePage = http://code.google.com/p/Smaaack/
 Minutes = 14
@@ -57,11 +56,12 @@ SMTitle := "Service Manager"
 SMRefreshControl := "ToolbarWindow327"
 SMAWOLMsg = `n`nNOTE: %SMTitle% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %Program% is running.`nAt that time it will automatically begin smacking SM to prevent inactivity timeout
 SMDisableOvernight = 1
-SMDisableLocked = 0
+SMDisableWhenLocked = 1
 SMRandomize = 1
 RandomMinutes = 0
 RandomMinutesMax = Minutes
-RandomMinutesMin := RandomMinutesMax // 2
+RandomMinutesMin := RandomMinutesMax // 3
+RandomInterval = 0
 Debug = 0
 Smacked = 0
 Startup = 1
@@ -109,12 +109,12 @@ if %0% >= 1
       }  ; end if DisableOvernight mode turned on
       else if Param in dl=n,dlock=n,dislock=n,disablelock=n
       {
-         SMDisableLocked = 0
+         SMDisableWhenLocked = 0
          SMDisableLockString = `n%Program% will NOT be disabled when the PC is locked
       }  ; end if DisableOvernight mode turned off
       else if Param in dl=y,dlock=y,dislock=y,disablelock=y
       {
-         SMDisableLocked = 1
+         SMDisableWhenLocked = 1
          SMDisableLockString = `n%Program% will be disabled when the PC is locked
       }  ; end if DisableOvernight mode turned on
       else if Param in r=y,rand=y,random=y,randomize=y
@@ -127,13 +127,22 @@ if %0% >= 1
          SMRandomize = 0
          SMRandomizeString = `n%Program% will smack at static, NOT random intervals of %Minutes% minutes
       }  ; end if random smack mode turned off
+      else if Param in help,?
+      {
+         goto HelpSmackL
+         ;ExitApp
+      }  ; end if help was requested
    }  ; end looping through all parameters
 }  ; end if we received a parameter
 
 if SMRandomize = 1
 {
    RandomMinutesMax = %Minutes%
-   RandomMinutesMin := RandomMinutesMax // 2
+   RandomMinutesMin := RandomMinutesMax // 3
+   if RandomMinutesMin = 0
+   {
+      RandomMinutesMin = 1
+   }  ; end if we have a 0 minimum value which causes a death spiral if this becomes the smack time
    Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax
    Interval := RandomMinutes * 60 * 1000
 }  ; end if randomize is on
@@ -192,6 +201,10 @@ if Startup = 1
    {
       menu, tray, ToggleCheck, Disable &Overnight  ; turn on the check mark to show we are disabled overnight
    }  ; end if SMDisableOvernight is set at command line
+   if SMDisableWhenLocked = 1
+   {
+      menu, tray, ToggleCheck, Disable when &PC Locked  ; turn on the check mark to show we are disabled when the PC is locked
+   }  ; end if SMDisableWhenLocked is set at command line
 }  ; end if we are in first pass startup
 
 SetTimer, SmackSML, %Interval%
@@ -214,14 +227,14 @@ return
 
 
 DisablePCLockedL:
-if SMDisableLocked = 0
+if SMDisableWhenLocked = 0
 {
-   SMDisableLocked = 1
+   SMDisableWhenLocked = 1
    menu, tray, ToggleCheck, Disable when &PC Locked
 }  ; end if we are toggling to disable overnight
 else
 {
-   SMDisableLocked = 0
+   SMDisableWhenLocked = 0
    menu, tray, ToggleCheck, Disable when &PC Locked
 }  ; end if we are toggling to not disable when locked
 return
@@ -249,13 +262,7 @@ return
 
 SmackSML:
 SmackSM()
-if (SMRandomize = 1) and (Minutes > 4)
-{
-   Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax  ; Random, OutputVar [, Min, Max]
-   SetTimer, SmackSML, off,0
-   RandomInterval := %RandomMinutes% * 60 * 1000
-   SetTimer, SmackSML, %RandomInterval%,0
-}  ; end if SMRandomize is 1
+PCLockedNow = 0
 return
 
 
@@ -265,7 +272,11 @@ if SMRandomize = 0
 {
    SMRandomize = 1
    RandomMinutesMax = %Minutes%
-   RandomMinutesMin := RandomMinutesMax // 2
+   RandomMinutesMin := RandomMinutesMax // 3
+   if RandomMinutesMin = 0
+   {
+      RandomMinutesMin = 1
+   }  ; end if we have a 0 minimum value which causes a death spiral if this becomes the smack time
    Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax
    if Debug = 1
    {
@@ -298,6 +309,7 @@ SmackSM()
 {
    global Program
    global Version
+   global Author
    global HomePage
    global Minutes
    global Interval
@@ -310,8 +322,9 @@ SmackSM()
    global SMAWOLMsg
    global SMRefreshControl
    global SMDisableOvernight
-   global SMDisableLocked
+   global SMDisableWhenLocked
    global SMRandomize
+   global RandomInterval
    global RandomMinutes
    global RandomMinutesMax
    global RandomMinutesMin
@@ -319,6 +332,18 @@ SmackSM()
    
    FormatTime, HourNow,, H
    FormatTime, MinNow,, m
+   
+   
+   if !DllCall("User32\OpenInputDesktop","int",0*0,"int",0*0,"int",0x0001L*1)
+   {
+      PCLockedNow = 1
+   }  ; end if the computer is locked right now
+   if (SMDisableWhenLocked = 1) and (PCLockedNow = 1)
+   {
+      ; do nothing if the disable when locked has not been disabled
+      return
+   }  ; end if the computer is not locked and disable when locked is set
+
    
    if ( SMDisableOvernight = 0 ) or ( HourNow >= 7 ) and ( HourNow <= 18 )
    {
@@ -347,7 +372,7 @@ SmackSM()
          {
             Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax  ; Random, OutputVar [, Min, Max]
             SetTimer, SmackSML, off,0
-            RandomInterval := %RandomMinutes% * 60 * 1000
+            RandomInterval := RandomMinutes * 60 * 1000
             SetTimer, SmackSML, %RandomInterval%,0
          }  ; end if SMRandomize is 1
          FormatTime, SmackTime,, dddd MMMM d, yyyy hh:mm:ss tt
@@ -392,8 +417,9 @@ AboutSmack()
    global SMAWOLMsg
    global SMRefreshControl
    global SMDisableOvernight
-   global SMDisableLocked
+   global SMDisableWhenLocked
    global SMRandomize
+   global RandomInterval
    global RandomMinutes
    global RandomMinutesMax
    global RandomMinutesMin
@@ -485,8 +511,9 @@ HelpSmack()
    global SMAWOLMsg
    global SMRefreshControl
    global SMDisableOvernight
-   global SMDisableLocked
+   global SMDisableWhenLocked
    global SMRandomize
+   global RandomInterval
    global RandomMinutes
    global RandomMinutesMax
    global RandomMinutesMin
@@ -494,9 +521,45 @@ HelpSmack()
    
    HelpMessage =
    (
-This program accepts one numeric parameter only, the number of minutes to
-delay between smacking SM. If you don't give a valid integer parameter
-the default is 14.
+%Program% accepts up to four parameters, which if used, can be in any order,
+case insensitive.
+
+One numeric parameter is accepted, an integer number of minutes to delay between
+smacking SM. If you don't give a valid integer parameter the default is 14 (minutes).
+
+Three additional parameters can also be used, to change behavior, also all accessible
+by right clicking the system tray icon. You can use an of the options below, though 
+it seems kind of stupid to type a long one when a short one works the same, but maybe
+you feel you need need the typing practice!
+   disableovernight: This toggles %Program% between not smacking between 6pm and 7am(default),
+   and smacking continuously. This is not advised because it wastes server resources and licenses,
+   and may also attract unwanted attention.
+      dn=y | dnight=y | disnight=y | disablenight=y or dn=n | dnight=n | disnight=n | disablenight=n
+   disable when locked: If you are not at your computer you might want to leave %Program%, but
+   consider the need. Once again, you are wasting server resources and licenses if you're gone for
+   an extended periof of time.
+      dl=y | dlock=y | dislock=y | disablelock=y or dl=n | dlock=n | dislock=n | disablelock=n
+   randomize smack interval: Just what it says, it randomizes the smack frequency to be less
+   obvious about what it is doing. The random interval is based on a pseudo random number
+   ranging from the static interval (default 14, or a value you specify), and one third of
+   the static interval. Every smack when randomize is enabled, including a manual %Program% Now
+   smack will reset the random smack time.
+      r=y | rand=y | random=y | randomize=y or r=n | rand=n | random=n | randomize=n
+
+Three additional tray menu items are worth a mention:
+  - 'Change Timeout': pops up a slider control allowing you to change the timeout value
+    to anything between 1 and 60. 60 may not bypass the current SM inactivity
+    timeout depending how the SM server in your organization has been configured.
+    You can achieve the same thing by stopping and restarting %Program%,
+    or by simply re-running %Program% with a different integer parameter.
+  - 'Disable %Program%': simply pauses the program, so that you can manually stop it
+    running for a while, then resume again later. When disabled, a check mark appears
+    next to the menu item.
+  - '%Program% now': sends a smack to SM immediately. The primary use for this is
+    for you to test, to see that the program will work. You can do this with the SM
+    window minimized or open and active. To see that it works, try expanding a few 
+    items with the [+] under the System Navigator panel on the left side of SM.
+    After SM is smacked, all items in the System Navigator panel should be collapsed.
 
 The point of this program is to save the current window and cursor position,
 hop over to SM and click the green 'Refresh the whole tree' icon at the
@@ -514,24 +577,10 @@ activities in the SM 'System Navigator' to expand those activities. Carry
 on working as normal, and you should see them collapse as the refresh button
 is clicked.
 
-This should also work when your screensaver kicks in and the screen is locked.
-
-Three menu items available by right clicking the system tray icon may be worth
-a mention.
-  - 'Change Timeout': pops up a slider control allowing you to change the timeout value
-    to anything between 1 and 60. 60 may not bypass the current SM inactivity
-    timeout depending how your SM server has been configured.
-    You can achieve the same thing by stopping and restarting %Program%,
-    or by simply re-running %Program% with a different integer parameter.
-  - 'Disable %Program%': simply pauses the program, so that you can stop it running
-    for a while, then resume again later. When disabled, a check mark appears next
-    to the menu item.
-  - '%Program% now': sends a smack to SM immediately. The only real use for this is
-    for you to test, to see that the program will work. You can do this with the SM
-    window minimized or open and active. To see that it works, try expanding a few 
-    items with the [+] under the System Navigator panel on the left side of SM.
-    After SM is smacked, all items in the System Navigator panel should be collapsed.
-
+This should also work when your screensaver kicks in and the screen is locked, unless
+you have disabled %Program% from activating when the PC is locked. See the tray menu
+option 'Disable when PC Locked'. A check mark next to this option means it will not
+smack when the screensaver activates and locks the computer.
 
 %Program% is brought to you by %Author%, a former
 "I hate the SM inactivity timeout" disgruntled user. Have fun!
@@ -544,12 +593,14 @@ a mention.
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
    
    Gui, 2: Font, s10, Verdana
-   Gui, 2: Add, Text, x266 y6, %HelpMessage%
+   ; Gui, 2: Add, Text, x266 y6, %HelpMessage%
+   Gui, 2: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400, %HelpMessage%
    Gui, 2: Font, underline
    Gui, 2: Add, Text, cBlue gHelpHomePage, Click here to visit %Program%'s home page
    Gui, 2: Font, norm
    Gui, 2: Add, Button, default, CloseHelp
    Gui, 2: Show,, Help: %Program% %Version%
+   Send ^{Home}
    Return
    
    HelpHomePage:
@@ -570,6 +621,7 @@ ChangeSmack()
 {
    global Program
    global Version
+   global Author
    global HomePage
    global Minutes
    global Interval
@@ -582,9 +634,10 @@ ChangeSmack()
    global SMAWOLMsg
    global SMRefreshControl
    global SMDisableOvernight
-   global SMDisableLocked
+   global SMDisableWhenLocked
    global SMRandomize
    global RandomMinutes
+   global RandomInterval
    global RandomMinutesMax
    global RandomMinutesMin
    global Debug
@@ -619,7 +672,11 @@ ChangeSmack()
    if SMRandomize = 1
    {
       RandomMinutesMax = %Minutes%
-      RandomMinutesMin := RandomMinutesMax // 2
+      RandomMinutesMin := RandomMinutesMax // 3
+      if RandomMinutesMin = 0
+      {
+         RandomMinutesMin = 1
+      }  ; end if we have a 0 minimum value which causes a death spiral if this becomes the smack time
       Random, RandomMinutes, RandomMinutesMin, RandomMinutesMax
       Interval := RandomMinutes * 60 * 1000
    }  ; end if randomize is on
@@ -654,18 +711,17 @@ ChangeRecord()
 {
    global Program
    global Version
+   global Author
    global HomePage
    global SMAAACK_Changes
    
    ; -------------------------------------------
-   ; Make a GUI help window
+   ; Make a GUI Change Record window
    Gui, 3: Add, Picture, xp+0 y+10 w250 h250 gChangeHomePage Icon hwndPicExe, Smaaack.exe
    hIcon := ExtractIcon("Smaaack.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
-
-   ;Gui, 3: Add, Text, x266 y6, %SMAAACK_Changes%
    Gui, 3: Font, s10, Verdana
-   Gui, 3: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h250, %SMAAACK_Changes%
+   Gui, 3: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400, %SMAAACK_Changes%
    Gui, 3: Font, underline
    Gui, 3: Add, Text, cBlue gHelpHomePage, Click here to visit %Program%'s home page
    Gui, 3: Font, norm
