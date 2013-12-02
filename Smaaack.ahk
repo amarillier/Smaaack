@@ -4,7 +4,7 @@
 ; Still to test if SM9 is running, if not, do nothing
 
 Program := "Smaaack!"
-Version := "v1.1"
+Version := "v1.1.1"
 Minutes = 14
 SM9Title := "Wolseley Service Manager"
 SM9RefreshControl := "ToolbarWindow327"
@@ -16,12 +16,19 @@ if %0% >= 1
    Minutes = %1%
    if Minutes is integer
    {
+      if (Minutes < 5) or (Minutes > 15)
+      {
+         MsgBox ,,%Program% %Version%, You entered a parameter %Minutes% which is < 5 or > 15.`nThe default is 14 because the SM9 timeout is 15 minutes.`n`n5 or less is ok for testing, but not necessary.`nMore than 14 will very likely cause the inactivity timeout to activate.`n`nYou can leave %Program% running like this, or exit and restart, or just`nrun %Program% again with a new, more suitable parameter`nand it will reload.
+      }  ; end if the number seems too low or too high
 	   Interval := Minutes * 60 * 1000
    }  ; end if it is numeric
    else
    {
-      GoSub HelpSmack
+      MsgBox ,,%Program% command line help,%Program%: %Version% only accepts one parameter, an integer number.`n`nThis program is for people who hate the SM9 inactivity timer.`nThe parameter is the number of minutes to delay between `n'smacking' SM9 into shape.The default is 14 minutes.`n`nRun this program, then right click the tray icon for menu options, help etc.
+      ;return
       ExitApp
+      ;sleep, 5000
+      ;Gosub, ExitSmack
    }  ; end if it is not numeric
 }  ; end if we received a parameter
 else
@@ -33,19 +40,43 @@ MsgBox ,,,Interval is set to %Interval% (%Minutes% minutes) `nRight click the tr
 SetTitleMatchMode, 2   ; set for partial window title matching
 
 #Persistent
-Menu, tray, add, &About, AboutSmack ; Creates an about menu item
-Menu, tray, add, &Help, HelpSmack  ; Creates a help menu item.
-Menu, tray, add, &Exit, ExitSmack  ; Creates an exit app menu item.
+Menu, tray, add, &About, AboutSmackL ; Creates an about menu item
+Menu, tray, add, &Help, HelpSmackL  ; Creates a help menu item.
+Menu, tray, add, &Exit, ExitSmackL  ; Creates an exit app menu item.
 Menu, tray, add  ; Creates a separator line.
 Menu, tray, NoStandard  ; this removes the tray icon menu items
 Menu, tray, Standard  ; this restores the tray icon menu items at the end of the menu
 
-SetTimer, SmackSM9, %Interval%
+SetTimer, SmackSM9L, %Interval%
 return
 
+AboutSmackL:
+AboutSmack()
+return
+
+HelpSmackL:
+HelpSmack()
+return
+
+ExitSmackL:
+ExitSmack()
+return
+
+SmackSM9L:
+SmackSM9()
+return
+
+
 ; ------------------------------------
-SmackSM9:
+SmackSM9()
 {
+   global Program
+   global Version
+   global Minutes
+   global SM9Title
+   global Smacked
+   global Debug
+   
    IfWinExist, %SM9Title%
    {
       ; Get ID of active window
@@ -61,6 +92,11 @@ SmackSM9:
       WinActivate, ahk_id %ActiveWin%
       
       Smacked++
+      if Debug > 0
+      {
+         MsgBox ,,TEST,Smacked is %Smacked%,1
+      }  ; end if debug mode
+      
    }  ; end if SM9 is active
    else
    {
@@ -73,8 +109,13 @@ SmackSM9:
 }  ; end of SmackSM9
 
 ; ------------------------------------
-AboutSmack:
+AboutSmack()
 {
+   global Program
+   global Version
+   global Minutes
+   global Smacked
+   
    AboutMessage =
    (
 %Program%, %Version% has smacked SM9 %Smacked% times so far!
@@ -136,8 +177,13 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
 }  ; end of AboutSmackGUI
 
 ; ------------------------------------
-HelpSmack:
+HelpSmack()
 {
+   global Program
+   global Version
+   global Minutes
+   global Smacked
+   
    HelpMessage =
    (
 This program accepts one numeric parameter only, the number of minutes to
@@ -202,7 +248,7 @@ Maybe there's an egg.
 }  ; end of HelpSmack
 
 ; ------------------------------------
-ExitSmack:
+ExitSmack()
 {
    ExitApp
 }  ; end of ExitSmack
