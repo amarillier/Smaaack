@@ -3,12 +3,28 @@
 ; right of SM every 14 minutes
 ; Brought to you by Homer Sapions, April 2013
 
+; NOTE: Compile this with AutoHotkey Classic so that the icon file can be properly 
+; embedded into the executable to be displayed in About, Help, Changelog etc. 
+; If AutoHotkey-L is used the image does not work, we have to use different tricks
+; where the image can be embedded, but then to be used must be unpacked into the
+; same directory as the executable program is located. The image can be auto deleted
+; at program termination, but may be left behind if the program aborts unexpectdely 
+; or is killed using task manager or any other process management utilities.
+
 ; To-do
 ; - Add code to test if Sounds directory exists and contains wavs to be played as alternates
+; - Convert to using FileInstall and FileDelete to work with AutoHotkey-L
+; FileInstall, TicketMonkey.jpg, TicketMonkey.jpg, 1
+; FileDelete, %A_Temp%\FiveLittleMonkeys.mp3
 
 ; Change record
 SMAAACK_Changes =
 (
+Changes with v 1.2.3
+   - 
+   - Changed home page from Google Code to Sourceforge.net since Google is 
+     abandoning all their users and dumping Google Code
+     
 Changes with v 1.2.2
    - Added a check for a directory named Sounds in the same directory where Smaaack is
      installed. If one is found, and it contains .wav files, then these will be read,
@@ -59,9 +75,9 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.2.2"
+Version := "v1.2.3"
 Author := "Homer Sapions"
-HomePage = http://code.google.com/p/Smaaack/
+HomePage = https://sourceforge.net/projects/smaaack/  ; was http://code.google.com/p/Smaaack/
 Minutes = 14
 NewMinutes = 0
 Interval = 0
