@@ -4,11 +4,21 @@
 ; Brought to you by Homer Sapions, April 2013
 
 ; To-do
-; - Fix help not displa from command line parameter at startup
+; - use FileInstall to embed a .wav file
+; - add a tray emnu item to enable/disable sounds
+; - play the sound after smacking if sound is enabled
 
 ; Change record
 SMAAACK_Changes =
 (
+Changes with v 1.2.1
+   - Bug fix for reactivating the window that was active right before a smack
+   - Added a little bit of silly fun, a smack sound can be turned on now when SM is smacked
+     enable or disable sound effects via tray menu, or command line:
+        s=y | snd=y | sound=y or s=n | snd=n | sound=n
+   - Minor tray menu changes to rearrange menu items a bit more logically
+
+   
 Changes with v 1.2.0
   - Added a hyperlink to google code home page in About and Help windows.
   - Added a Randomize capability to change the smack time delay between defined smack interval and one
@@ -46,7 +56,7 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.2.0"
+Version := "v1.2.1"
 Author := "Homer Sapions"
 HomePage = http://code.google.com/p/Smaaack/
 Minutes = 14
@@ -67,8 +77,18 @@ Smacked = 0
 Startup = 1
 FormatTime, StartTime,, hh:mm:ss tt
 SmackTime = None yet (start time: %StartTime%)
+SmackSound = 0
 
 SetTitleMatchMode, 2   ; set for partial window title matching
+
+; install the Smaaack wave file at compile time, extract as needed at run time
+FileInstall, Smaaack.wav, Smaaack.wav, 1
+hModule   := DllCall( "GetModuleHandle", Str, A_ScriptFullPath ) 
+hResource := DllCall("FindResource", UInt,hModule, UInt,[color=red]666[/color], UInt,10 )
+nSize     := DllCall("SizeofResource", UInt,hModule, UInt, hResource )
+hResData  := DllCall("LoadResource", UInt,0, UInt,hResource )
+Buffer    := DllCall("LockResource", "UInt", hResData )
+
 
 
 if %0% >= 1
@@ -127,11 +147,14 @@ if %0% >= 1
          SMRandomize = 0
          SMRandomizeString = `n%Program% will smack at static, NOT random intervals of %Minutes% minutes
       }  ; end if random smack mode turned off
-      else if Param in help,?
+      else if Param in s=y,sound=y,snd=y
       {
-         goto HelpSmackL
-         ;ExitApp
-      }  ; end if help was requested
+         SmackSound = 1
+      }  ; end if smacksound mode turned on
+      else if Param in s=n,sound=n,snd=n
+      {
+         SmackSound = 0
+      }  ; end if smacksound mode turned off
    }  ; end looping through all parameters
 }  ; end if we received a parameter
 
@@ -150,7 +173,8 @@ else
 {
    Interval := 14 * 60 * 1000  ; 14 minutes should be good - SetTimer works in milliseconds, so 14 * 60 * 1000
 }  ; end if randomize is not on
-         
+
+
 if Debug = 1
 {
    Version = %Version% . (DEBUG active)
@@ -175,14 +199,16 @@ DetectHiddenWindows, On
 Menu, tray, Icon, Smaaack.exe,, 1
 Menu, tray, add, &About, AboutSmackL ; Creates an about menu item
 Menu, tray, add, &Help, HelpSmackL  ; Creates a help menu item.
+Menu, tray, add, Change &Record, ChangeRecordL
+Menu, tray, add
 Menu, tray, add, &Change Timeout, ChangeSmackL
 Menu, tray, add, Disable &Overnight, DisableOvernightL
 Menu, tray, add, Disable when &PC Locked, DisablePCLockedL
 Menu, tray, add, &Disable Smaaack, DisableSmackL
 Menu, tray, add, &Randomize Smaaack, RandomizeSmackL
-Menu, tray, add, &Smaaack now, SmackSML
+Menu, tray, add, S&M-AAACK Sound, SmackSoundL
 Menu, tray, add
-Menu, tray, add, Change &Record, ChangeRecordL
+Menu, tray, add, &Smaaack now, SmackSML
 Menu, tray, add, &Exit, ExitSmackL  ; Creates an exit app menu item.
 Menu, tray, NoStandard  ; this removes the standard tray icon menu items
 ;Menu, tray, add  ; Creates a separator line.
@@ -205,6 +231,10 @@ if Startup = 1
    {
       menu, tray, ToggleCheck, Disable when &PC Locked  ; turn on the check mark to show we are disabled when the PC is locked
    }  ; end if SMDisableWhenLocked is set at command line
+   if SmackSound = 1
+   {
+      menu, tray, ToggleCheck, S&M-AAACK Sound  ; turn on the check mark to show we make smack sounds
+   }  ; end if SmackSound is turned on at command line
 }  ; end if we are in first pass startup
 
 SetTimer, SmackSML, %Interval%
@@ -266,6 +296,20 @@ PCLockedNow = 0
 return
 
 
+SmackSoundL:
+if SmackSound = 0
+{
+   SmackSound = 1
+   menu, tray, ToggleCheck, S&M-AAACK Sound
+}  ; end if we are turning it on
+else
+{
+   SmackSound = 0
+   menu, tray, ToggleCheck, S&M-AAACK Sound
+}  ; end if we are turning it off
+return
+
+
 RandomizeSmackL:
 menu, tray, ToggleCheck, &Randomize Smaaack
 if SMRandomize = 0
@@ -319,6 +363,7 @@ SmackSM()
    global HomePage
    global Smacked
    global SmackTime
+   global SmackSound
    global SMAWOLMsg
    global SMRefreshControl
    global SMDisableOvernight
@@ -352,7 +397,7 @@ SmackSM()
          ; Get ID of active window
          WinGet, ActiveWin, ID, A
 
-         ; Check if the window is minimized. If it is, maximize it quickly, then minimize again after
+         ; Check if the SM window is minimized. If it is, maximize it quickly, then minimize again after
          WinGet Minimized, MinMax, %SMTitle%
          IfEqual Minimized,-1, WinRestore, %SMTitle%
 
@@ -361,11 +406,16 @@ SmackSM()
          ;ControlClick ,%SMRefreshControl%, %SMTitle%,,LEFT,1,x215 y80 NA
          ;ControlClick ,,%SMTitle%,,,,x215 y80 NA
          ControlClick %SMRefreshControl%, %SMTitle%,, LEFT
+         
+         if SmackSound = 1
+         {
+            SoundPlay, Smaaack.wav
+         }  ; end if smack sound is enabled
 
          IfEqual Minimized,-1, WinMinimize, %SMTitle%
       
          ; make original window active again
-         WinActivate, ahk_id ActiveWin
+         WinActivate, ahk_id %ActiveWin%
       
          Smacked++
          if (SMRandomize = 1) and (Minutes > 4)
@@ -385,7 +435,7 @@ SmackSM()
       {
          if Debug > 0
          {
-           MsgBox ,,,%SMTitle% is not active!,2
+            MsgBox ,,,%SMTitle% is not active!,2
          }  ; end if debug mode
       }  ; end if SM is not active
    }  ; end if time is between 7am and 6pm
@@ -436,7 +486,7 @@ AboutSmack()
    {
       RandomMessage := "`nRandom smacking is enabled at " . RandomMinutes . " minutes (from " . RandomMinutesMin . " to " . RandomMinutesMax . ")`n"
    }  ; end if randomize is on
-   
+         
    AboutMessage =
    (
 %Program%, %Version% has smacked SM %Smacked% times so far!
@@ -527,39 +577,59 @@ case insensitive.
 One numeric parameter is accepted, an integer number of minutes to delay between
 smacking SM. If you don't give a valid integer parameter the default is 14 (minutes).
 
-Three additional parameters can also be used, to change behavior, also all accessible
-by right clicking the system tray icon. You can use an of the options below, though 
+Four additional parameters can also be used, to change behavior, also all accessible
+by right clicking the system tray icon. You can use any of the options below, though 
 it seems kind of stupid to type a long one when a short one works the same, but maybe
 you feel you need need the typing practice!
-   disableovernight: This toggles %Program% between not smacking between 6pm and 7am(default),
-   and smacking continuously. This is not advised because it wastes server resources and licenses,
-   and may also attract unwanted attention.
-      dn=y | dnight=y | disnight=y | disablenight=y or dn=n | dnight=n | disnight=n | disablenight=n
-   disable when locked: If you are not at your computer you might want to leave %Program%, but
-   consider the need. Once again, you are wasting server resources and licenses if you're gone for
-   an extended periof of time.
-      dl=y | dlock=y | dislock=y | disablelock=y or dl=n | dlock=n | dislock=n | disablelock=n
-   randomize smack interval: Just what it says, it randomizes the smack frequency to be less
-   obvious about what it is doing. The random interval is based on a pseudo random number
-   ranging from the static interval (default 14, or a value you specify), and one third of
-   the static interval. Every smack when randomize is enabled, including a manual %Program% Now
-   smack will reset the random smack time.
-      r=y | rand=y | random=y | randomize=y or r=n | rand=n | random=n | randomize=n
+
+Sample command line parameter use is below, showing some defaults, some non default:
+   Smaaack 14 r=y dn=y dl=n s=y
+This will start %Program% with a maximum 14 minute (default) smack interval.
+Randomizing will be activated (default) at 1/3 of 14, which will be 4 (rounded integer).
+Smacking will not occur between 6pm and 7am (default).
+Smacking will continue even when the PC is locked (not default).
+Smack sounds will be enabled each time SM is smacked (not default).
+
+All of these can be toggled through a pop up menu by right clicking the tray icon.
+   - disable overnight: This toggles %Program% between not smacking between 6pm and 7am
+      (default), and smacking continuously. Not disabling overnight is not advised
+      because it wastes server resources and licenses, and may also attract unwanted
+      attention. dn=n is the default.
+   dn=y | dnight=y | disnight=y | disablenight=y or dn=n | dnight=n | disnight=n | disablenight=n
+   
+   - disable when locked: If you are not at your computer you might want to leave %Program%
+      enabled, but consider the need. Once again, you are wasting server resources and licenses
+      if you're gone for an extended periof of time. dl=y is the default.
+   dl=y | dlock=y | dislock=y | disablelock=y or dl=n | dlock=n | dislock=n | disablelock=n
+   
+   - randomize smack interval: Just what it says, it randomizes the smack frequency to be less
+      obvious about what it is doing. The random interval is based on a pseudo random number
+      ranging from the static interval (default 14, or a value you specify), and one third of
+      the static interval. Every smack when randomize is enabled, including a manual
+      '%Program% Now' smack will re-randomize the smack time. r=y is the default.
+   r=y | rand=y | random=y | randomize=y or r=n | rand=n | random=n | randomize=n
+   
+   - Smaaack Sound: This enables or disables a sound when SM is smacked. Default is to NOT
+      make any sound. This one is for fun. If it doesn't make you smile and appreciate this little
+      program at least once, there's not much hope for you. You may as well go suck on a lemon
+      and see if that cheers you up a bit. s=n is the default
+   s=y | snd=y | sound=y or s=n | snd=n | sound=n
 
 Three additional tray menu items are worth a mention:
   - 'Change Timeout': pops up a slider control allowing you to change the timeout value
-    to anything between 1 and 60. 60 may not bypass the current SM inactivity
-    timeout depending how the SM server in your organization has been configured.
-    You can achieve the same thing by stopping and restarting %Program%,
-    or by simply re-running %Program% with a different integer parameter.
+     to anything between 1 and 60. 60 may not bypass the current SM inactivity
+     timeout depending how the SM server in your organization has been configured.
+     You can achieve the same thing by stopping and restarting %Program%,
+     or by simply re-running %Program% with a different integer parameter.
   - 'Disable %Program%': simply pauses the program, so that you can manually stop it
-    running for a while, then resume again later. When disabled, a check mark appears
-    next to the menu item.
+     running for a while, then resume again later. When disabled, a check mark appears
+     next to the menu item.
   - '%Program% now': sends a smack to SM immediately. The primary use for this is
-    for you to test, to see that the program will work. You can do this with the SM
-    window minimized or open and active. To see that it works, try expanding a few 
-    items with the [+] under the System Navigator panel on the left side of SM.
-    After SM is smacked, all items in the System Navigator panel should be collapsed.
+     for you to test, to see that the program will work. You can do this with the SM
+     window minimized or open and active. To see that it works, try expanding a few 
+     items with the [+] under the System Navigator panel on the left side of SM.
+     After SM is smacked, all items in the System Navigator panel should be collapsed.
+    
 
 The point of this program is to save the current window and cursor position,
 hop over to SM and click the green 'Refresh the whole tree' icon at the
@@ -594,7 +664,7 @@ smack when the screensaver activates and locks the computer.
    
    Gui, 2: Font, s10, Verdana
    ; Gui, 2: Add, Text, x266 y6, %HelpMessage%
-   Gui, 2: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400, %HelpMessage%
+   Gui, 2: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400 w700, %HelpMessage%
    Gui, 2: Font, underline
    Gui, 2: Add, Text, cBlue gHelpHomePage, Click here to visit %Program%'s home page
    Gui, 2: Font, norm
@@ -608,11 +678,9 @@ smack when the screensaver activates and locks the computer.
    return
    
    2GuiEscape:
-   HelpGuiClose:
    2ButtonCloseHelp:
    Gui, 2: Submit
    Gui, 2: Destroy
-
    return
 }  ; end of HelpSmack
 
