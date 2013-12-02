@@ -1,19 +1,27 @@
 ; Stop the stupid SM9 inactive timeout by clicking the "refresh the whole tree" icon at top
-; right of SM9 every 10 minutes
+; right of SM9 every 14 minutes
 
-; Still to test if SM9 is running, if not, do nothing
 
-Program := "Smaaack!"
-Version := "v1.1.1"
+Program := "SM-AAACK!"
+Version := "v1.1.2"
 Minutes = 14
-SM9Title := "Wolseley Service Manager"
+NewMinutes = 0
+Interval = 0
+; SM9Title := "Wolseley Service Manager"
+SM9Title := "Service Manager"
 SM9RefreshControl := "ToolbarWindow327"
+SM9AWOLMsg = `n`nNOTE: %SM9Title% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %Program% is running.`nAt that time it will automatically begin smacking SM9 to prevent inactivity timeout
 Debug = 0
 Smacked = 0
+FormatTime, Startup,, hh:mm:ss tt
+SmackTime = None yet (start time: %Startup%)
+
+SetTitleMatchMode, 2   ; set for partial window title matching
 
 if %0% >= 1
 {
    Minutes = %1%
+   SecondParam = %2%
    if Minutes is integer
    {
       if (Minutes < 5) or (Minutes > 15)
@@ -25,27 +33,46 @@ if %0% >= 1
    else
    {
       MsgBox ,,%Program% command line help,%Program%: %Version% only accepts one parameter, an integer number.`n`nThis program is for people who hate the SM9 inactivity timer.`nThe parameter is the number of minutes to delay between `n'smacking' SM9 into shape.The default is 14 minutes.`n`nRun this program, then right click the tray icon for menu options, help etc.
-      ;return
       ExitApp
-      ;sleep, 5000
-      ;Gosub, ExitSmack
    }  ; end if it is not numeric
+   
+   if SecondParam in d,D,debug,DEBUG
+   {
+      Debug = 1
+      MsgBox ,,,Turning debug mode on,3
+   }  ; end if debug mode turned on
 }  ; end if we received a parameter
 else
 {
    Interval := 14 * 60 * 1000  ; 14 minutes should be good - SetTimer works in milliseconds, so 14 * 60 * 1000
 }  ; end if we did not receive any parameters
 
-MsgBox ,,,Interval is set to %Interval% (%Minutes% minutes) `nRight click the tray icon for menu options,3
-SetTitleMatchMode, 2   ; set for partial window title matching
+if Debug = 1
+{
+   Version = %Version% . (DEBUG active)
+   MsgBox ,,%Program% %Version% command line help,%Program%: %Version% Debug mode is turned on, 3
+}
+
+Intro = Interval is set to %Interval% (%Minutes% minutes) `nRight click the tray icon for menu options
+IfWinNotExist %SM9Title%
+{
+   Intro = %Intro% . %SM9AWOLMsg%
+}  ; end if SM9 is not currently open
+
+MsgBox ,,,%Intro%,10
+DetectHiddenWindows, On
 
 #Persistent
+Menu, tray, Icon, SM-AAACK.exe,, 1
 Menu, tray, add, &About, AboutSmackL ; Creates an about menu item
 Menu, tray, add, &Help, HelpSmackL  ; Creates a help menu item.
+Menu, tray, add, &Change Timeout, ChangeSmackL
+Menu, tray, add, &Disable SM-AAACK, DisableSmackL
+Menu, tray, add, &SM-AAACK now, SmackSM9L
 Menu, tray, add, &Exit, ExitSmackL  ; Creates an exit app menu item.
-Menu, tray, add  ; Creates a separator line.
-Menu, tray, NoStandard  ; this removes the tray icon menu items
-Menu, tray, Standard  ; this restores the tray icon menu items at the end of the menu
+Menu, tray, NoStandard  ; this removes the standard tray icon menu items
+;Menu, tray, add  ; Creates a separator line.
+;Menu, tray, Standard  ; this restores the tray icon menu items at the end of the menu
 
 SetTimer, SmackSM9L, %Interval%
 return
@@ -56,6 +83,15 @@ return
 
 HelpSmackL:
 HelpSmack()
+return
+
+ChangeSmackL:
+ChangeSmack()
+return
+
+DisableSmackL:
+menu, tray, ToggleCheck, &Disable SM-AAACK
+Pause, toggle
 return
 
 ExitSmackL:
@@ -74,7 +110,9 @@ SmackSM9()
    global Version
    global Minutes
    global SM9Title
+   global SM9RefreshControl
    global Smacked
+   global SmackTime
    global Debug
    
    IfWinExist, %SM9Title%
@@ -82,19 +120,26 @@ SmackSM9()
       ; Get ID of active window
       WinGet, ActiveWin, ID, A
 
-      ; make SM window active
-      ; WinActivate, Wolseley Service Manager  ; This is not actually necessary as the ControlClick takes acre of it
+      ; Check if the window is minimized. If it is, maximize it qucikly, then minimize again after
+      WinGet Minimized, MinMax, %SM9Title%
+      IfEqual Minimized,-1, WinRestore, %SM9Title%
 
       ; click refresh on SM9
+      SetControlDelay -1
+      ;ControlClick ,%SM9RefreshControl%, %SM9Title%,,LEFT,1,x215 y80 NA
+      ;ControlClick ,,%SM9Title%,,,,x215 y80 NA
       ControlClick %SM9RefreshControl%, %SM9Title%,, LEFT
 
+      IfEqual Minimized,-1, WinMinimize, %SM9Title%
+      
       ; make original window active again
-      WinActivate, ahk_id %ActiveWin%
+      WinActivate, ahk_id ActiveWin
       
       Smacked++
+      FormatTime, SmackTime,, dddd MMMM d, yyyy hh:mm:ss tt
       if Debug > 0
       {
-         MsgBox ,,TEST,Smacked is %Smacked%,1
+         MsgBox ,,TEST,Smacked is %Smacked%,5
       }  ; end if debug mode
       
    }  ; end if SM9 is active
@@ -114,24 +159,35 @@ AboutSmack()
    global Program
    global Version
    global Minutes
+   global SM9Title
    global Smacked
+   global SmackTime
+   global SM9AWOLMsg
+   global Debug
+  
+   Stuff := ""
+   IfWinNotExist %SM9Title%
+   {
+      Stuff = %SM9AWOLMsg%`n
+   }  ; end if SM9 is active
    
    AboutMessage =
    (
 %Program%, %Version% has smacked SM9 %Smacked% times so far!
 
 Current setting is to smack SM9 every %Minutes% minutes to stop it from
-timing you out.
-
-If you want to change the timeout interval, just run
-%Program% again with a new integer parameter. This will cause it to
-prompt if you want to reload, and will apply the new settings.
-
+timing you out. The most recent smack: %SmackTime%
+%Stuff%
 The default interval is 14 minutes which should subdue the obnoxious beast
 known as the SM9 inactivity timeout. If this doesn't work for you for
 some reason, try making the delay a bit shorter.
 
-e.g. Smaaack 10
+There are two ways to change the timeout. The easiest is to right click
+%Program%'s icon in the system tray and select 'Change Timeout', then
+use the slider control. The other way is by re-running the program with
+a new integer parameter which will prompt if you want to reload the program.
+
+e.g. SM-AAACK 10
 
 %Program% is brought to you by a former
 "I hate the SM9 inactivity timeout" disgruntled user. Have fun!
@@ -146,22 +202,27 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
 
    ; -------------------------------------------
    ; Make a GUI about window
-   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
-   Gui, 1: Add, Picture, w3 h3 gAboutBigAl Icon, Smaaack.exe
-   hIcon := ExtractIcon("Smaaack.exe", 1)
+   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, SM-AAACK.exe
+   Gui, 1: Add, Picture, w3 h3 gAboutBigAl Icon, SM-AAACK.exe
+   hIcon := ExtractIcon("SM-AAACK.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
-   Gui, Add, Text, x266 y6 w390 h320 , %AboutMessage%
+   Gui, Add, Text, x266 y6, %AboutMessage%
    Gui, Add, Button, default, CloseAbout
-   Gui, Show,, About: %Program%, %Version%
+   Gui, 1: Add, Picture, w1 h2 gAboutEgg3 Icon, SM-AAACK.exe
+   Gui, Show,, About: %Program% %Version%
    Return
 
    AboutEggClick:
-   MsgBox, 0, %Program% Easter egg, What? Now you think you're smart or something?`n`nYou really want to know who wrote this?`nNice try! At least you found the Easter egg.
+   MsgBox, 0, %Program% Easter egg, What? Now you think you're smart or something?`n`nYou really want to know who wrote this?`nNice try! At least you found the Easter egg.`nMaybe there are more.
    return
    
    AboutBigAl:
-   MsgBox, 0, %Program% Easter egg, Now you're onto something!`n`nDoes 'Big Al' mean anything to you? `nNo? ... too bad!
+   MsgBox, 0, %Program% Easter egg, Now you're onto something!`n`nDoes 'Big Al' mean anything to you? `n`nNo? ... too bad!`nKeep looking for eggs, you might find more ...
+   return
+   
+   AboutEgg3:
+   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@gmail.com and see if Homer Sapions responds!
    return
    
    GuiEscape:
@@ -183,12 +244,13 @@ HelpSmack()
    global Version
    global Minutes
    global Smacked
+   global Debug
    
    HelpMessage =
    (
 This program accepts one numeric parameter only, the number of minutes to
 delay between smacking SM9. If you don't give a valid integer parameter
-the default is 14, which should help with the inactivity timeout.
+the default is 14, which should circumvent the SM9 inactivity timeout.
 
 The point of this program is to save the current window and cursor position,
 hop over to SM9 and click the green 'Refresh the whole tree' icon at the
@@ -206,7 +268,24 @@ activities in the SM9 'System Navigator' to expand those activities. Carry
 on working as normal, and you should see them collapse as the refresh button
 is clicked.
 
-This even works when your screensaver kicks in and the screen is locked.
+This should also work when your screensaver kicks in and the screen is locked.
+
+Three menu items avaiable by right clicking the system tray icon may be worth
+a mention.
+- Change Timeout pops up a slider conrol allowing you to change the timeout value
+  from anything between 1 and 60. 60 will not bypass the current SM9 inactivity
+  timeout which appears to be 15 minutes. You can achive the same thing by stopping
+  and restarting %Program%, or by simply re-running %Program% with a different
+  integer parameter.
+- Disable %Program%: simply pauses the program, so that you can stop it running
+  for a while, then resume again later. When disabled, a check mark appears next
+  to the menu item.
+- %Program% now: sends a smack to SM9 immediately. The only real use for this is
+  for you to test, to see that the program will work. You can do this with the SM9
+  window minimized or open and active. To see that it works, try expanding a few 
+  items with the [+] under the System Navigator panel on the left side of SM9.
+  After SM9 is smacked, all items in the System Navigator panel should be collapsed.
+
 
 %Program% is brought to you by a former
 "I hate the SM9 inactivity timeout" disgruntled user. Have fun!
@@ -217,14 +296,15 @@ Maybe there's an egg.
    
    ; -------------------------------------------
    ; Make a GUI help window
-   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, Smaaack.exe
-   Gui, 2: Add, Picture, w3 h3 gHelpBigAl Icon, Smaaack.exe
-   hIcon := ExtractIcon("Smaaack.exe", 1)
+   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gAboutEggClick Icon hwndPicExe, SM-AAACK.exe
+   Gui, 2: Add, Picture, w3 h3 gHelpBigAl Icon, SM-AAACK.exe
+   hIcon := ExtractIcon("SM-AAACK.exe", 1)
    SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
 
-   Gui, 2: Add, Text, x266 y6 w390 h360 , %HelpMessage%
+   Gui, 2: Add, Text, x266 y6, %HelpMessage%
    Gui, 2: Add, Button, default, CloseHelp
-   Gui, 2: Show,, Help: %Program%, %Version%
+   Gui, 2: Add, Picture, w1 h2 gHelpEgg3 Icon, SM-AAACK.exe
+   Gui, 2: Show,, Help: %Program% %Version%
    Return
 
    HelpEggClick:
@@ -233,6 +313,10 @@ Maybe there's an egg.
    
    HelpBigAl:
    MsgBox, 0, %Program% Easter egg, Now you're onto something!`n`nDoes 'Big Al' mean anything to you? `nNo? ... too bad!
+   return
+   
+   HelpEgg3:
+   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@gmail.com and see if Homer Sapions responds!
    return
    
    2GuiEscape:
@@ -246,6 +330,63 @@ Maybe there's an egg.
    
    return
 }  ; end of HelpSmack
+
+; ------------------------------------
+ChangeSmack()
+{
+   global Minutes
+   global Interval
+   global NewMinutes
+   global Message
+   global Debug
+   
+   NewMinutes := Minutes
+   
+   Message = Pick a new timeout prevention SM-AAACK value (currently %Minutes%)
+   Gui, Add, Text, w480 h20 vMessage
+   Gui, add, slider, w620 Range1-60 Tickinterval1 ToolTip Page5 vNewMinutes gSlide, %Minutes%
+   Gui, Add, Text, h20 x20 y60, 1
+   Gui, Add, Text, h20 x60 y60, 5
+   Gui, Add, Text, h20 x108 y60, 10
+   Gui, Add, Text, h20 x157 y60, 15
+   Gui, Add, Text, h20 x208 y60, 20
+   Gui, Add, Text, h20 x259 y60, 25
+   Gui, Add, Text, h20 x309 y60, 30
+   Gui, Add, Text, h20 x360 y60, 35
+   Gui, Add, Text, h20 x410 y60, 40
+   Gui, Add, Text, h20 x460 y60, 45
+   Gui, Add, Text, h20 x511 y60, 50
+   Gui, Add, Text, h20 x560 y60, 55
+   Gui, Add, Text, h20 x610 y60, 60
+   Gui, Add, button, x300, OK
+   ;Gui, Add, Picture, w1 h2 gChangeEgg Icon, SM-AAACK.exe
+   Gui, Show
+   GuiControl,,Message,%Message%
+   Return 
+
+   ButtonOK:
+   Gui, Submit
+   Gui, Destroy
+   Minutes := NewMinutes
+   Interval := Minutes * 60 * 1000
+   if Debug = 1
+   {
+      MsgBox ,,DEBUG ChangeSmack, Inside ChangeSmack: Minutes = %Minutes%  Interval = %Interval%,2
+   }  ; end if Debug mode
+   SetTimer, SmackSM9L, off,0
+   SetTimer, SmackSM9L, %Interval%,0
+   return
+   
+   Slide:
+   NewMessage = Pick a new timeout prevention SM-AAACK value (currently %Minutes% will change to %NewMinutes%)
+   GuiControl,,Message, %NewMessage%
+   Return
+   
+   ChangeEgg:
+   MsgBox, 0, %Program% Another Easter egg!, Whoo-hooo! You found another Easter egg.`n`nYou're good. Do you really want to know?`n`nTry sending an email to hsapions@gmail.com and see if Homer Sapions responds!
+   return
+   
+}  ; end of ChangeSmack
 
 ; ------------------------------------
 ExitSmack()
