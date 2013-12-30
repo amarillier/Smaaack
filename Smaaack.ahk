@@ -20,8 +20,11 @@
 ; Change record
 SMAAACK_Changes =
 (
+Changes with v 1.2.4
+   - Removed built in icon mechanism that accessed the icon without extracting it. This
+     bound us to AutoHotkey Classic because it did not work under AutoHotkey_L
+     
 Changes with v 1.2.3
-   - 
    - Changed home page from Google Code to Sourceforge.net since Google is 
      abandoning all their users and dumping Google Code
      
@@ -75,7 +78,7 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.2.3"
+Version := "v1.2.4"
 Author := "Homer Sapions"
 HomePage = https://sourceforge.net/projects/smaaack/  ; was http://code.google.com/p/Smaaack/
 Minutes = 14
@@ -104,14 +107,9 @@ SetTitleMatchMode, 2   ; set for partial window title matching
 DetectHiddenWindows, On
 SetWorkingDir %A_ScriptDir%
 
-; install the Smaaack wave file at compile time, extract as needed at run time
-FileInstall, Smaaack.wav, Smaaack.wav, 1
-hModule   := DllCall( "GetModuleHandle", Str, A_ScriptFullPath ) 
-hResource := DllCall("FindResource", UInt,hModule, UInt,[color=red]666[/color], UInt,10 )
-nSize     := DllCall("SizeofResource", UInt,hModule, UInt, hResource )
-hResData  := DllCall("LoadResource", UInt,0, UInt,hResource )
-Buffer    := DllCall("LockResource", "UInt", hResData )
-
+; install the Smaaack wave and icon files at compile time, extract as needed at run time
+FileInstall, Smaaack.wav, %A_Temp%\Smaaack.wav, 1
+FileInstall, Smaaack.ico, %A_Temp%\Smaaack.ico, 1
 
 
 if %0% >= 1
@@ -562,12 +560,7 @@ Don't %Program% and drive. Don't %Program% your spouse or kids.
 
    ; -------------------------------------------
    ; Make a GUI about window
-   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon hwndPicExe, Smaaack.exe
-   hIcon := ExtractIcon("Smaaack.exe", 1)
-   ;DllCall("Shell32\SHGetFileInfo" . (A_IsUnicode ? "W":"A"), "str", FileName
-   ;         , "uint", 0, ptr, &sfi, "uint", sfi_size, "uint", [color=red]0x100[/color])
-   SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
-
+   Gui, 1: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon, %A_Temp%\Smaaack.ico
    Gui, Font, s10, Verdana
    Gui, Add, Text,x266 y6, %AboutMessage%
    Gui, Font, underline
@@ -710,12 +703,8 @@ smack when the screensaver activates and locks the computer.
    
    ; -------------------------------------------
    ; Make a GUI help window
-   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gHelpHomePage Icon hwndPicExe, Smaaack.exe
-   hIcon := ExtractIcon("Smaaack.exe", 1)
-   SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
-   
+   Gui, 2: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon, %A_Temp%\Smaaack.ico
    Gui, 2: Font, s10, Verdana
-   ; Gui, 2: Add, Text, x266 y6, %HelpMessage%
    Gui, 2: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400 w700, %HelpMessage%
    Gui, 2: Font, underline
    Gui, 2: Add, Text, cBlue gHelpHomePage, Click here to visit %Program%'s home page
@@ -823,6 +812,8 @@ ChangeSmack()
 ; -------------------------------------------------------------------------------
 ExitSmack()
 {
+   FileDelete, %A_Temp%\Smaaack.ico
+   FileDelete, %A_Temp%\Smaaack.wav
    ExitApp
 }  ; end of ExitSmack
 
@@ -837,9 +828,7 @@ ChangeRecord()
    
    ; -------------------------------------------
    ; Make a GUI Change Record window
-   Gui, 3: Add, Picture, xp+0 y+10 w250 h250 gChangeHomePage Icon hwndPicExe, Smaaack.exe
-   hIcon := ExtractIcon("Smaaack.exe", 1)
-   SendMessage, 0x170, hIcon,,, ahk_id %PicExe%  ; STM_SETICON
+   Gui, 3: Add, Picture, xp+0 y+10 w250 h250 gAboutHomePage Icon, %A_Temp%\Smaaack.ico
    Gui, 3: Font, s10, Verdana
    Gui, 3: Add, Edit, -WantCtrlA ReadOnly VScroll x266 y6 h400, %SMAAACK_Changes%
    Gui, 3: Font, underline
@@ -862,64 +851,5 @@ ChangeRecord()
 
    return
 }  ; end of ChangeRecord
-
-; -------------------------------------------------------------------------------
-; this function comes from Lexikos, http://www.autohotkey.com/board/topic/22347-incorrect-loading-of-icos-through-gui-add-picture/#entry145875
-ExtractIcon(Filename, IconNumber, IconSize=0)
-{
-    static SmallIconSize, LargeIconSize
-    if (!SmallIconSize) {
-        SysGet, SmallIconSize, 49  ; 49, 50  SM_CXSMICON, SM_CYSMICON 
-        SysGet, LargeIconSize, 11  ; 11, 12  SM_CXICON, SM_CYICON 
-    }
-
-
-    VarSetCapacity(phicon, 4, 0)
-    h_icon = 0
-
-    ; If possible, use PrivateExtractIcons, which supports any size of icon.
-    if A_OSVersion in WIN_VISTA,WIN_2003,WIN_XP,WIN_2000
-    {
-        VarSetCapacity(piconid, 4, 0)
-        
-        ; MSDN: "... this function is deprecated ..." (oh well)
-        ret := DllCall("PrivateExtractIcons"
-            , "str", Filename
-            , "int", IconNumber-1   ; zero-based index of the first icon to extract
-            , "int", IconSize
-            , "int", IconSize
-            , "str", phicon         ; pointer to an array of icon handles...
-            , "str", piconid        ; piconid - won't be used
-            , "uint", 1             ; nIcons - number of icons to extract
-            , "uint", 0, "uint")    ; flags
-        
-        if (ret && ret != 0xFFFFFFFF)
-            h_icon := NumGet(phicon)
-    }
-    else
-    {   ; Use ExtractIconEx, which only returns 16x16 or 32x32 icons.
-        VarSetCapacity(phiconSmall, 4, 0)
-        
-        ; Extract the icon from an executable, DLL or icon file.
-        if DllCall("shell32.dll\ExtractIconExA"
-            , "str", Filename
-            , "int", IconNumber-1   ; zero-based index of the first icon to extract
-            , "str", phicon         ; pointer to an array of icon handles...
-            , "str", phiconSmall
-            , "uint", 1)
-        {
-            ; Use the best-fit size; clean up the other.
-            if (IconSize <= SmallIconSize) {
-                DllCall("DestroyIcon", "uint", NumGet(phicon))
-                h_icon := NumGet(phiconSmall)
-            } else {
-                DllCall("DestroyIcon", "uint", NumGet(phiconSmall))
-                h_icon := NumGet(phicon)
-            }
-        }
-    }
-
-    return h_icon
-}
 
 ; -------------------------------------------------------------------------------
