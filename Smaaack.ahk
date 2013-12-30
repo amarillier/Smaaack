@@ -3,24 +3,14 @@
 ; right of SM every 14 minutes
 ; Brought to you by Homer Sapions, April 2013
 
-; NOTE: Compile this with AutoHotkey Classic so that the icon file can be properly 
-; embedded into the executable to be displayed in About, Help, Changelog etc. 
-; If AutoHotkey-L is used the image does not work, we have to use different tricks
-; where the image can be embedded, but then to be used must be unpacked into the
-; same directory as the executable program is located. The image can be auto deleted
-; at program termination, but may be left behind if the program aborts unexpectdely 
-; or is killed using task manager or any other process management utilities.
-
 ; To-do
 ; - Add code to test if Sounds directory exists and contains wavs to be played as alternates
-; - Convert to using FileInstall and FileDelete to work with AutoHotkey-L
-; FileInstall, TicketMonkey.jpg, TicketMonkey.jpg, 1
-; FileDelete, %A_Temp%\FiveLittleMonkeys.mp3
 
 ; Change record
 SMAAACK_Changes =
 (
 Changes with v 1.2.4
+   - Removed comments about compiling with AutoHotkey Classic
    - Removed built in icon mechanism that accessed the icon without extracting it. This
      bound us to AutoHotkey Classic because it did not work under AutoHotkey_L
      
