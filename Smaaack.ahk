@@ -203,7 +203,7 @@ IfWinNotExist %SMTitle%
    Intro = %Intro% . %SMAWOLMsg%
 }  ; end if SM is not currently open
 
-MsgBox ,,,%Intro%,20
+MsgBox ,,,%Intro%, 5
 
 ; Check for and read a list of all .wav files in the .\Sounds directory into SmackSounds
 IfExist %A_ScriptDir%\Sounds
