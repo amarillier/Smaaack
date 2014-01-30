@@ -9,6 +9,9 @@
 ; Change record
 SMAAACK_Changes =
 (
+Changes with v 1.2.5
+   - Added a 'quiet' startup option
+   
 Changes with v 1.2.4
    - Removed comments about compiling with AutoHotkey Classic
    - Removed built in icon mechanism that accessed the icon without extracting it. This
@@ -68,7 +71,7 @@ Changes with v 1.1.3
 )  ; end of change record
 
 Program := "Smaaack!"
-Version := "v1.2.4"
+Version := "v1.2.5"
 Author := "Homer Sapions"
 HomePage = https://sourceforge.net/projects/smaaack/  ; was http://code.google.com/p/Smaaack/
 Minutes = 14
@@ -78,8 +81,11 @@ SMTitle := "Service Manager"
 SMRefreshControl := "ToolbarWindow327"
 SMAWOLMsg = `n`nNOTE: %SMTitle% does not appear to be running right now.`n %Program% will simply run quietly in the system tray and do nothing`nuntil it detects that %SMTitle% is running.`nAt that time it will automatically begin smacking SM to prevent inactivity timeout
 SMDisableOvernight = 1
+SMDisableOvernightString = `n%Program% will be disabled overnight
 SMDisableWhenLocked = 1
+SMDisableWhenLockedString = `n%Program% will be disabled when the PC is locked
 SMRandomize = 1
+SMRandomizeString = `n%Program% will smack at random intervals up to %Minutes% minutes
 RandomMinutes = 0
 RandomMinutesMax = Minutes
 RandomMinutesMin := RandomMinutesMax // 3
@@ -90,8 +96,11 @@ Startup = 1
 FormatTime, StartTime,, hh:mm:ss tt
 SmackTime = None yet (start time: %StartTime%)
 SmackSound = 0
+SmackSoundString = `n%Program% will NOT make sounds when smacking
 SmackRandomWav = Smaaack.wav
 SmackWavCount = 0
+Quiet = 0
+QuietString = `nQuiet startup is off, these messages will display
 
 SetTitleMatchMode, 2   ; set for partial window title matching
 DetectHiddenWindows, On
@@ -123,6 +132,11 @@ if %0% >= 1
          }  ; end if the number seems too low or too high
 	      Interval := Minutes * 60 * 1000
       }  ; end if it is numeric
+      else if Param in q,Q,quiet,QUIET
+      {
+         Quiet = 1
+         QuietString = Quiet startup
+      }  ; end if quiet startup mode turned on
       else if Param in d,D,debug,DEBUG
       {
          Debug = 1
@@ -161,10 +175,12 @@ if %0% >= 1
       else if Param in s=y,sound=y,snd=y
       {
          SmackSound = 1
+         SmackSoundString = `n%Program% will make sounds when smacking
       }  ; end if smacksound mode turned on
       else if Param in s=n,sound=n,snd=n
       {
          SmackSound = 0
+         SmackSoundString = `n%Program% will NOT make sounds when smacking
       }  ; end if smacksound mode turned off
    }  ; end looping through all parameters
 }  ; end if we received a parameter
@@ -196,6 +212,7 @@ Intro = Interval is set to %Interval% (%Minutes% minutes)
 Intro = %Intro% . %SMDisableOvernightString%
 Intro = %Intro% . %SMDisableLockString%
 Intro = %Intro% . %SMRandomizeString%
+Intro = %Intro% . %QuietString%
 Intro = %Intro% . `n`nRight click the tray icon for menu options
 
 IfWinNotExist %SMTitle%
@@ -203,7 +220,9 @@ IfWinNotExist %SMTitle%
    Intro = %Intro% . %SMAWOLMsg%
 }  ; end if SM is not currently open
 
-MsgBox ,,,%Intro%, 5
+if ( Quiet = 0 ) {
+   MsgBox ,,,%Intro%, 5
+}
 
 ; Check for and read a list of all .wav files in the .\Sounds directory into SmackSounds
 IfExist %A_ScriptDir%\Sounds
@@ -602,24 +621,31 @@ HelpSmack()
    
    HelpMessage =
    (
-%Program% accepts up to four parameters, which if used, can be in any order,
+%Program% accepts a number of parameters, which if used, can be in any order,
 case insensitive.
 
 One numeric parameter is accepted, an integer number of minutes to delay between
 smacking SM. If you don't give a valid integer parameter the default is 14 (minutes).
 
-Four additional parameters can also be used, to change behavior, also all accessible
+Additional parameters can also be used, to change behavior, also all accessible
 by right clicking the system tray icon. You can use any of the options below, though 
 it seems kind of stupid to type a long one when a short one works the same, but maybe
 you feel you need need the typing practice!
 
 Sample command line parameter use is below, showing some defaults, some non default:
-   Smaaack 14 r=y dn=y dl=n s=y
+   Smaaack 14 r=y dn=y dl=n s=y q
 This will start %Program% with a maximum 14 minute (default) smack interval.
 Randomizing will be activated (default) at 1/3 of 14, which will be 4 (rounded integer).
 Smacking will not occur between 6pm and 7am (default).
 Smacking will continue even when the PC is locked (not default).
 Smack sounds will be enabled each time SM is smacked (not default).
+Smack startup will be quiet - that is, it will not pop up a MsgBox telling you 
+  about the smack interval, and status of disable overnight, disable when locked,
+  sounds enabled and quiet startup.
+
+'Quiet' is the only parameter that is command line only, not available through the tray
+menu, because it affects thet startup and display or no display of a startup message.
+   q | Q | quiet | QUIET
 
 All of these can be toggled through a pop up menu by right clicking the tray icon.
    - disable overnight: This toggles %Program% between not smacking between 6pm and 7am
